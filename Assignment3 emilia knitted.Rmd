@@ -1,0 +1,772 @@
+---
+title: "ECON 370: Assignment 3"
+author: "Emilia Romero"
+date: "Due: Before class on October 28th, 2025"
+output: 
+  pdf_document:
+    latex_engine: xelatex
+header-includes:
+  - \usepackage{geometry}
+  - \usepackage{float}
+  - \usepackage{graphicx}
+  - \usepackage{caption}
+  - \usepackage{multirow}
+  - \usepackage{array}
+  - \usepackage[affil-it]{authblk}
+  - \usepackage{lscape}
+  - \usepackage[bottom]{footmisc}
+  - \usepackage{amssymb}
+  - \usepackage{amsmath}
+  - \geometry{top=1in, bottom=1in}
+  - \setlength{\parindent}{0pt}
+  - \setlength{\parskip}{12pt}
+---
+
+```{r setup, include=FALSE}
+# Note, this is global setting for all code chunks
+knitr::opts_chunk$set(include = FALSE)
+```
+
+# Directions
+
+## As a reminder, LLMs and AIs are allowed from use on this assignment.
+
+This assignment serves dual purpose: **application of `tidyverse`** and **cleaning and merging some of your data for the final project**. You can check **final project details** as a guide. You can use AI but consider using StackOverflow before asking AI for a solution!
+
+Use the Rmd template and write code to answer the following questions. In order to ensure smooth grading, I will ask you to write both your code and explanation (as comment) in code chunk. Please write your code and answer in the corresponding place.
+
+Each question is worth three points. For each section, a "question" corresponds to a number.
+
+Please **comment** your code clearly. 0.5 point per question will be deducted if there is a significantly lack of commenting. Also, the easier your code is to read, the more likely I will be able to figure out what you're doing.
+
+Remember to **host your data on GitHub** if it cannot directly be pulled using functions such as `tq_get`.
+
+There are many ways to clean data. However, I will ask you to apply **pipeline and `dplyr` package** for data wrangling here. 0.5 point per question will be deducted if other method is used while getting the correct answer.
+
+You need to work individually for this homework.
+
+------------------------------------------------------------------------
+
+# O. Return Data
+
+***This is the code to extract return data online. Do not modify.***
+
+Note: we are using the S&P 500 index returns, not individual companies in the S&P 500.
+
+```{r}
+# Data Loading in Section, do not modify
+library(tidyquant)
+library(tidyverse) # ggplot2 is already in tidyverse
+library(lubridate)
+
+# Get S&P500 daily data
+SP500_simple_returns = tq_get("^GSPC",
+                               from = "1984-01-01",
+                               to   = "2024-12-31",
+                               get  = "stock.prices") |>
+  tq_transmute(
+    select     = adjusted,       # adjusted price for accuracy
+    mutate_fun = periodReturn,   # calculate period returns
+    period     = "monthly",      # monthly returns
+    type       = "arithmetic",   # simple return (percentage change)
+    col_rename = "monthly_return"
+  ) |>
+  # Convert to percentage
+  mutate(monthly_return = monthly_return*100)
+
+head(SP500_simple_returns)
+
+```
+
+------------------------------------------------------------------------
+
+# I. Variables and Reasoning
+
+In this assignment, I will ask you to pull **three variables each from a different source** (you will need to do at least 10 from at least 4 sources in the final project).
+
+1.  Name the three variables, sources and frequency of your data.
+
+```{r}
+# Answer:
+# Variable 1: S&P 500 Index 
+# Source: Fred 
+# Frequency: Daily 
+
+# Variable 2: U.S. 5-Year Treasury Yield 
+# Source: U.S. Department of the Treasury 
+# Frequency: Daily
+
+# Variable 3: VIX (Volatility Index)
+# Source: Yahoo Finance 
+# Frequency: Daily 
+```
+
+2.  Reason to include each variable(articles or strong logic support).
+
+```{r}
+# Answer:
+# Reason to include Variable 1: I believe the S&P 500 is a good variable because it represents the performance of 500 large U.S. companies. It is a indicator of the overall economic and financial market health. In this analysis, the changes in the index could be used to measure economic growth expectations and the financial stability. 
+
+# Reason to include Variable 2: The U.S. 5 Year Treasury Yield is an interest rate that reflects investors expectations regarding inflation, growth, and Federal Reserve policy. Using the Treasury yield to compare with the stock market performance would help assess the relationship between market returns, interest rates, and risk appetite. 
+
+# Reason to include Variable 3: The VIX helps measure the market expectations of the future volatility. The VIX complements the stock performance data from the S&P 500 by providing insight into investor sentiment and their risk perception. 
+
+```
+
+3.  Upload all your **raw** data on GitHub unless they can be extracted using R functions (without downloading things). Make sure they have **long enough history**. Then download each data as a **tibble**:
+
+```{r}
+load("/Users/milaromero/Downloads/s_p_500_index.RData")
+save(s_p_500_index, file = "s_p_500_index.RData")
+# S&P 500 Index Closing Price 
+library(readxl)
+library(tibble)
+
+# Convert to tibble (if read_excel didn’t already)
+my_tibble <- as_tibble(s_p_500_index) 
+tibble::as_tibble(s_p_500_index)
+
+# View the tibble
+print(my_tibble) 
+
+load("/Users/milaromero/Downloads/u_s_5_year_treasury_yield.RData") 
+save(u_s_5_year_treasury_yield, file = "u_s_5_year_treasury_yield.RData")
+load("/Users/milaromero/Downloads/u_s_5_year_treasury_yield.RData") 
+# U.S. 5-Year Treasury Yield 
+library(readxl)
+library(tibble)
+
+# Convert to tibble (if read_excel didn’t already)
+my_tibble <- as_tibble(u_s_5_year_treasury_yield)
+
+# View the tibble
+print(my_tibble) 
+
+load("~/Downloads/vix.RData") 
+save(vix, file = "vix.RData")
+load("/Users/milaromero/Downloads/vix.RData") 
+# VIX -- 
+library(readxl)
+library(tibble)
+
+# Convert to tibble (if read_excel didn’t already)
+my_tibble <- as_tibble(vix)
+
+# View the tibble
+print(my_tibble) 
+
+library(dplyr)
+
+# Clean S&P 500 Index Closing Price
+s_p_500_clean <- s_p_500_index %>%
+  as_tibble() %>%
+  # Rename columns for clarity, e.g. 'Date', 'Close'
+  rename(date = 1, close = 2) %>%
+  # Convert date to Date format
+  mutate(date = as.Date(date)) %>%
+  # Remove rows with missing Close values
+  filter(!is.na(close)) %>%
+  # Remove duplicate dates if any
+  distinct(date, .keep_all = TRUE)
+
+# Clean U.S. 5-Year Treasury Yield
+u_s_5yr_treasury_clean <- u_s_5_year_treasury_yield %>%
+  as_tibble() %>%
+  rename(date = 1, yield = 2) %>%
+  mutate(date = as.Date(date)) %>%
+  filter(!is.na(yield)) %>%
+  distinct(date, .keep_all = TRUE)
+
+# Clean VIX
+vix_clean <- vix %>%
+  as_tibble() %>%
+  rename(date = 1, vix_value = 2) %>%
+  mutate(date = as.Date(date)) %>%
+  filter(!is.na(vix_value)) %>%
+  distinct(date, .keep_all = TRUE) 
+
+```
+
+------------------------------------------------------------------------
+
+# II. Data Cleaning
+
+1.  Check the **date format** of your datasets. Do you see different formats than "yyyy-mm-dd"? Do you different ways of documenting with month end? If so, fix them with **`mutate`** function combined with `lubridate` package.
+
+```{r}
+# Answer about date issue: No, I don't see a different format other than the one listed. 
+
+
+```
+
+2.  Use `left_join` to **join** all your data with the return data "SP500_simple_returns".
+
+```{r}
+# I used GitHub to help me format how to join all my data. 
+library(dplyr)
+# Example: joining your main data with the returns data by the "Date" column
+SP500_joined <- left_join(s_p_500_index, u_s_5_year_treasury_yield, vix, by = "Date")
+# Print the result
+print(SP500_joined)
+library(dplyr)
+
+# Clean S&P 500
+s_p_500_clean <- s_p_500_index %>%
+  as_tibble() %>%
+  rename(Date = 1, SP500_Close = 2) %>%
+  mutate(Date = as.Date(Date)) %>%
+  filter(!is.na(SP500_Close)) %>%
+  distinct(Date, .keep_all = TRUE)
+
+# Clean Treasury Yield
+treasury_clean <- u_s_5_year_treasury_yield %>%
+  as_tibble() %>%
+  rename(Date = 1, Treasury_Yield = 2) %>%
+  mutate(Date = as.Date(Date)) %>%
+  filter(!is.na(Treasury_Yield)) %>%
+  distinct(Date, .keep_all = TRUE)
+
+# Clean VIX
+vix_clean <- vix %>%
+  as_tibble() %>%
+  rename(Date = 1, VIX = 2) %>%
+  mutate(Date = as.Date(Date)) %>%
+  filter(!is.na(VIX)) %>%
+  distinct(Date, .keep_all = TRUE)
+
+# Join using dplyr and pipeline
+SP500_joined <- s_p_500_clean %>%
+  left_join(treasury_clean, by = "Date") %>%
+  left_join(vix_clean, by = "Date")
+
+# Print result
+print(SP500_joined) 
+
+```
+
+3.  What is the situation of **mixed frequency** and **missing data**? If there are, fill in with appropriate method. One reference of mixed frequency is [MIDAS](https://rady.ucsd.edu/_files/faculty-research/valkanov/midas-touch.pdf).
+
+```{r}
+# Answer about mixed frequency and missing data issue:
+# Mixed frequency occurs when there is data sampled at various intervals. When you merge or model the various datas together, the difference in frequencies needs to be handled explicitly. If I join my S&P 500 index data with my VIX data, it could result in many daily rows having the same value of VIX. To detect mixed frequency. 
+library(dplyr)
+library(lubridate)
+library(tidyr)
+
+sp_daily <- s_p_500_index %>%
+group_by(Date) %>%
+summarise(SP500 = last(na.omit('Price')), .groups = "drop")
+
+vix_daily <- vix %>%
+group_by(Date) %>%
+summarise(VIX = last(na.omit('Open')), .groups = "drop")
+
+treas_daily <- u_s_5_year_treasury_yield %>%
+group_by(Date) %>%
+summarise(Treasury5Y = last(na.omit('Open')), .groups = "drop")
+
+# --- Step 2a: Clean column names ---
+colnames(s_p_500_index) <- trimws(colnames(s_p_500_index))
+colnames(vix) <- trimws(colnames(vix))
+colnames(u_s_5_year_treasury_yield) <- trimws(colnames(u_s_5_year_treasury_yield))
+# --- Step 2b: Define value columns ---
+sp_val_col <- "Price"
+vix_val_col <- "Open"
+treas_val_col <- "Open"
+# --- Step 3: Summarize daily values (last value per date) ---
+sp_daily <- s_p_500_index %>%
+group_by(Date) %>%
+summarise(SP500 = last(na.omit(.data[[sp_val_col]])), .groups = "drop")
+vix_daily <- vix %>%
+group_by(Date) %>%
+summarise(VIX = last(na.omit(.data[[vix_val_col]])), .groups = "drop")
+treas_daily <- u_s_5_year_treasury_yield %>%
+group_by(Date) %>%
+summarise(Treasury5Y = last(na.omit(.data[[treas_val_col]])), .groups = "drop")
+
+# --- Step 4: Median gap function ---
+median_gap <- function(dates) {
+dates <- sort(dates)
+median(diff(dates))}
+# --- Step 5: Base SP500 dates for comparison ---
+base_dates <- tibble(Date = unique(sp_daily$Date))
+# --- Step 6: Create summary of mixed frequency and missing data ---
+diag <- tibble(
+series=c("SP500", "VIX", "Treasury5Y"),
+n_dates = c(
+length(unique(sp_daily$Date)),
+length(unique(vix_daily$Date)),
+length(unique(treas_daily$Date))),
+median_gap_days = c(
+median_gap(sp_daily$Date),
+median_gap(vix_daily$Date),
+median_gap(treas_daily$Date))) %>%
+mutate(pct_na_on_sp500_dates = c( 0,  
+# SP500 is base
+mean(is.na(left_join(base_dates, vix_daily, by = "Date")$VIX)) * 100, 
+mean(is.na(left_join(base_dates, treas_daily, by = "Date")$Treasury5Y)) * 100))
+# Step 7: Print the diagnostic table 
+print(diag)
+
+```
+
+4.  What is the situation of **publication bias** for all three variables? Are there any? If there are, use `mutate` and `lag` to make appropriate lags.
+
+```{r}
+# Answer about publication bias issue: Publication bias may appear if a predictor such as vix or the 5 year yield, is not available at the same frequency or same publication time as the S&P 500 prices. 
+
+
+# Code Below, remember commenting
+library(dplyr)
+library(lubridate)
+library(tidyr)
+
+# Assume these tibbles exist: s_p_500_index, vix, u_s_5_year_treasury_yield
+# You may need to adapt Date parsing to your format:
+parse_date_safe <- function(x) {
+  if (inherits(x, "Date")) return(as.Date(x))
+  if (inherits(x, "POSIXt")) return(as.Date(x))
+  as.Date(lubridate::parse_date_time(as.character(x), orders = c("mdy","ymd","dmy")))
+}
+
+# Standardize Date columns
+sp <- s_p_500_index %>% rename(Date = matches("(?i)^date$|trade_date", perl = TRUE)) %>% mutate(Date = parse_date_safe(Date)) %>% arrange(Date)
+vix <- vix %>% rename(Date = matches("(?i)^date$|trade_date", perl = TRUE)) %>% mutate(Date = parse_date_safe(Date)) %>% arrange(Date)
+treas <- u_s_5_year_treasury_yield %>% rename(Date = matches("(?i)^date$|trade_date", perl = TRUE)) %>% mutate(Date = parse_date_safe(Date)) %>% arrange(Date)
+
+# Helper: median gap in days
+median_gap <- function(d) {
+  d <- sort(unique(d))
+  if(length(d) < 2) return(NA_real_)
+  median(as.numeric(diff(d)))
+}
+
+base_dates <- tibble(Date = sort(unique(sp$Date)))
+
+# Choose VIX and Treasury value column names (adjust if different)
+# e.g., vix value column might be "VIX" or "close"; treas column might be "Yield" or "value"
+vix_val_col   <- names(select(vix, where(is.numeric)))[1]       # fallback: first numeric
+treas_val_col <- names(select(treas, where(is.numeric)))[1]     # fallback: first numeric
+
+# Build daily summaries (collapse duplicates to one daily value using last observation)
+vix_daily <- vix %>%
+  group_by(Date) %>%
+  summarise(VIX = last(na.omit(Open)), .groups = "drop")
+treas_daily <- treas %>%
+  group_by(Date) %>%
+  summarise(Treasury5Y = last(na.omit(Open)), .groups = "drop")
+
+diag <- tibble(
+  series = c("SP500", "VIX", "Treasury5Y"),
+  n_dates = c(length(unique(sp$Date)), length(unique(vix_daily$Date)), length(unique(treas_daily$Date))),
+  median_gap_days = c(median_gap(sp$Date), median_gap(vix_daily$Date), median_gap(treas_daily$Date))
+) %>%
+  mutate(pct_na_on_sp500_dates = c(
+    0,
+    mean(is.na(left_join(base_dates, vix_daily, by="Date")$VIX)) * 100,
+    mean(is.na(left_join(base_dates, treas_daily, by="Date")$Treasury5Y)) * 100
+  ))
+
+print(diag) 
+
+# Then after you safe default handle by forward-fill last published value then lag. 
+library(dplyr)
+library(lubridate)
+
+# 1) Inspect column names so you can verify
+cat("SP500 columns:\n")
+print(names(s_p_500_index))
+
+# 2) Robust selection of a price column
+possible_price_names <- c("Adj Close","Adj.Close","Adj_Close","adjusted","Adjusted","Close","close","price","PX_LAST")
+price_candidates <- intersect(possible_price_names, names(s_p_500_index))
+
+if (length(price_candidates) >= 1) {
+  price_col <- price_candidates[1]
+  message("Using detected price column: ", price_col)
+} else {
+  # fallback: first numeric column (excluding Date)
+  numeric_cols <- setdiff(names(select(s_p_500_index, where(is.numeric))), "Date")
+  if (length(numeric_cols) >= 1) {
+    price_col <- numeric_cols[1]
+    message("No common price name found. Falling back to first numeric column: ", price_col)
+  } else {
+    stop("Couldn't find a price column in s_p_500_index. Please tell me which column holds prices (e.g. 'Close' or 'Adj Close').")
+  }
+}
+
+# 3) Parse Date safely (adjust parse method to your format if needed)
+parse_date_safe <- function(x) {
+  if (inherits(x, "Date")) return(as.Date(x))
+  if (inherits(x, "POSIXt")) return(as.Date(x))
+  lubridate::parse_date_time(as.character(x), orders = c("mdy","ymd","dmy")) %>% as.Date()
+}
+
+s_sp500 <- s_p_500_index %>%
+  # detect date column name (common patterns)
+  { dcol <- names(.)[grepl("^date$|trade_date|day|^Date$", names(.), ignore.case = TRUE)]
+    if (length(dcol) >= 1) rename(., Date = !!sym(dcol[1])) else .
+  } %>%
+  mutate(Date = parse_date_safe(Date)) %>%
+  arrange(Date) %>%
+  # use the selected price column safely via .data[[price_col]]
+  mutate(price = as.numeric(.data[[price_col]]),
+         SP500_return = price / lag(price) - 1)
+
+# 4) Quick check
+print(head(s_sp500, 10)) 
+
+# Lastly you use MIDAS
+
+
+library(dplyr)
+
+load("~/Downloads/vix.RData")   # if saved earlier
+load("~/Downloads/s_p_500_index.RData")
+load("~/Downloads/u_s_5_year_treasury_yield.RData")
+library(dplyr)
+
+# S&P 500 daily
+sp_daily <- s_p_500_index %>%
+  group_by(Date) %>%
+  summarise(SP500 = last(na.omit(Price)), .groups = "drop") %>%
+  arrange(Date) %>%
+  mutate(SP500_return = (SP500 / lag(SP500) - 1) * 100)
+
+# VIX daily
+vix_daily <- vix %>%
+  group_by(Date) %>%
+  summarise(VIX = last(na.omit(Open)), .groups = "drop")
+
+# Treasury yield daily
+treas_daily <- u_s_5_year_treasury_yield %>%
+  group_by(Date) %>%
+  summarise(Treasury5Y = last(na.omit(Open)), .groups = "drop")
+joined2 <- sp_daily %>%
+  left_join(vix_daily, by = "Date") %>%
+  left_join(treas_daily, by = "Date")
+colnames(joined2)
+
+# assume joined2 is your cleaned daily tibble with Date, SP500_return, Treasury5Y, VIX, etc.
+# Inspect NAs / Infs / near-constant
+vars <- c("SP500_return", "Treasury5Y", "VIX")
+stopifnot(all(vars%in% names(joined2)))   
+# change names if needed
+
+# counts
+joined2 %>% summarise(across(all_of(vars),
+  list(n_na = ~sum(is.na(.)), n_inf = ~sum(!is.finite(.)), mean = ~mean(., na.rm=TRUE),
+       sd = ~sd(., na.rm=TRUE)), .names = "{.col}_{.fn}")) %>% print()
+
+# alternative: show rows with any NA/Inf
+bad_rows <- joined2 %>% filter(if_any(all_of(vars), ~ is.na(.) | !is.finite(.)))
+cat("Number of bad rows:", nrow(bad_rows), "\n")
+if (nrow(bad_rows) > 0) print(head(bad_rows, 10)) 
+
+library(zoo)        # for na.locf (optional)
+library(dplyr)
+library(lubridate)
+
+# Example conservative preparation:
+df <- joined2 %>%
+  arrange(Date) %>%
+  # forward fill Treasury so each daily row has the last published value
+  fill(Treasury5Y, .direction = "down") %>%
+  # create a 1-day lag of the low-frequency predictor if you want to avoid contemporaneous info
+  mutate(Treasury5Y_lag1 = lag(Treasury5Y, 1),
+         VIX_lag1 = lag(VIX, 1),
+         SP500_return = SP500_return) %>%
+  # keep only the columns needed for the MIDAS regression
+  select(Date, SP500_return, Treasury5Y_lag1, VIX_lag1) %>%
+  # drop rows with NA / Inf in the variables we will use
+  filter(if_all(c("SP500_return", "Treasury5Y_lag1", "VIX_lag1"), ~ !is.na(.) & is.finite(.))) %>%
+  ungroup()
+
+nrow(df)  # number of observations available for MIDAS
+# Build explicit lagged treasury columns (0..K)
+K <- 11
+df_lags <- df %>%
+  arrange(Date)
+
+for (i in 0:K) {
+  df_lags[[paste0("Treas_lag", i)]] <- dplyr::lag(df_lags$Treasury5Y_lag1, i)
+}
+# drop rows with NA
+df_lags2 <- df_lags %>% filter(if_all(starts_with("Treas_lag"), ~ !is.na(.))) 
+
+# Fit OLS
+lm_fit <- lm(SP500_return ~ VIX_lag1 + ., data = df_lags2 %>% select(SP500_return, VIX_lag1, starts_with("Treas_lag")))
+summary(lm_fit) 
+
+# Missing data occurs when some observations are absent for certain dates or variables after you merge your datasets. To handle this, you would use the code. 
+library(tidyr)
+
+# Forward fill all columns with missing values
+filled_data <- s_p_500_index %>% fill(everything(), .direction = "down")
+
+
+```
+
+5.  Use `lead` to create predictive date and predictive return.
+
+```{r}
+# I used GitHub to help, starting off by arranging by data, then computing the predictive return from prices then keeping only rows where the target is not NA and making sure the predictors are lagged. 
+library(dplyr)
+
+# use the object joined2
+df <- joined2 %>% arrange(Date)
+
+# created predictive date and predictive return of a day ahead and preferred: compute future return from future price/current price and also created 5-day and 22-day ahead targets
+df <- joined2 %>% arrange(Date)
+
+df_pred <- df %>%
+  mutate(
+    predictive_date = lead(Date, 1),
+    predictive_return_1 = (lead(SP500, 1) / SP500) - 1,
+    predictive_return_1_alt = lead(SP500_return, 1),
+    predictive_return_5  = (lead(SP500, 5) / SP500) - 1,
+    predictive_return_22 = (lead(SP500, 22) / SP500) - 1
+  ) %>%
+  filter(!is.na(predictive_return_1)) 
+
+# inspect
+glimpse(df_pred)
+head(df_pred[, c("Date", "predictive_date", "SP500", 
+                 "predictive_return_1", "predictive_return_5", 
+                 "predictive_return_22")])
+
+```
+
+6.  Filtering the desired dates: predictive date from1985 to 2024.
+
+```{r}
+# I used the R snippet to create a predictive date and a day ahead predictive return with a lead that also keeps only rows with available targets and required lagged predictors and filters predictive_date to the range 1985 to 2024. 
+library(dplyr)
+library(lubridate)
+
+names(df)
+df_pred_filtered <- df %>%
+  mutate(
+    predictive_date = lead(Date, 1),                 # next trading date
+    predictive_return_1 = lead(SP500_return, 1)      # use next day's SP500 return
+  ) %>%
+  # keep only rows with a non-missing target and required predictors (avoid look-ahead)
+  filter(!is.na(predictive_return_1)) %>%
+  # make sure predictors are all available
+  filter(!is.na(VIX), !is.na(Treasury5Y), !is.na(SP500_return)) %>%
+  # keep only dates within your preferred range
+  filter(predictive_date >= as.Date("1985-01-01") & predictive_date <= as.Date("2024-12-31"))
+
+# quick checks
+glimpse(df_pred_filtered)
+summary(df_pred_filtered$predictive_date)
+
+```
+
+------------------------------------------------------------------------
+
+# III. Exploration with `tidyverse`
+
+1.  Make the data longer using `pivot_longer`, each variable name are stored in a column called "Var_name" and all values are stored in a column called "Var_value".
+
+```{r}
+# I tried a simple function but it wouldn't work so I opted to a longer one. First I started with the dataframe name then autodetected a dataframe from a set of likely names. and lastly the function of when only certain predictor columns are pivoted. 
+load("~/Downloads/vix.RData")   # if saved earlier
+load("~/Downloads/s_p_500_index.RData")
+load("~/Downloads/u_s_5_year_treasury_yield.RData")
+library(dplyr)
+# S&P 500 daily
+sp_daily <- s_p_500_index %>%
+group_by(Date) %>%
+summarise(SP500 = last(na.omit(Price)), .groups = "drop") %>%
+arrange(Date) %>%
+mutate(SP500_return = (SP500 / lag(SP500) - 1) * 100)
+# VIX daily
+vix_daily <- vix %>%
+group_by(Date) %>%
+summarise(VIX = last(na.omit(Open)), .groups = "drop")
+# Treasury yield daily
+treas_daily <- u_s_5_year_treasury_yield %>%
+group_by(Date) %>%
+summarise(Treasury5Y = last(na.omit(Open)), .groups = "drop")
+joined2 <- sp_daily %>%
+left_join(vix_daily, by = "Date") %>%
+left_join(treas_daily, by = "Date")
+colnames(joined2)
+vars <- c("SP500_return", "Treasury5Y", "VIX")
+stopifnot(all(vars %in% names(joined2)))
+
+library(dplyr)
+library(tidyr)
+candidates <- c("df_model", "df_pred_filtered", "SP_joined_safe", "joined2", "joined", "s_sp500", "sp2")
+found <- NULL
+for (nm in candidates) {
+  if (exists(nm, envir = .GlobalEnv)) { 
+    found <- get(nm, envir = .GlobalEnv)
+    df_name <- nm
+    break
+  }
+}
+if (is.null(found)) stop("No candidate dataframe found. Provide the name of the dataframe you want to pivot.")
+
+message("Using dataframe: ", df_name)
+```
+
+2.  Use `group_by` to group by different values in "Var_name" and estimate the **mean** for each variable using `summarise`. Use `round` to round to 2 decimal places.
+
+```{r}
+# By grouping the long form data by Var_name and computing the mean of Var_value then rounding to 2 deciaml places. 
+
+library(dplyr)
+library(tidyr)
+library(lubridate)
+
+# Make sure joined2 exists (load it if needed)
+# joined2 <- read.csv("data/joined2.csv")   # example
+
+vars <- c("price", "SP500_return", "VIX", "Treasury5Y")
+
+df_long <- joined2 %>%
+  select(any_of(c("Date", vars))) %>%
+  mutate(Date = as.Date(Date)) %>%
+  arrange(Date) %>%
+  pivot_longer(
+    cols = -Date,
+    names_to = "Var_name",
+    values_to = "Var_value"
+  ) %>%
+  mutate(
+    Var_value_num = suppressWarnings(as.numeric(Var_value)),
+    Date_finite = !is.na(Date) & is.finite(as.numeric(Date)),
+    Var_finite  = is.finite(Var_value_num)
+  )
+
+message("df_long created successfully. Rows: ", nrow(df_long))
+
+```
+
+3. Use ggplot to visualize all the series together in a single plot with each series represented in a different
+color. Examine (with the plot) whether the series fluctuate around a stable level or display a trend
+that drifts away over time. 
+
+```{r}
+# First pivoted the data long then coerces to numeric, then removed non-finite data or the Var_value rows, then computed group diagnostics and showed if any problem groups then computed a safe z-score then filter groups used to smooth and plots with line width. 
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(lubridate)
+
+# Make sure your data frame exists
+if (!exists("joined2")) stop("joined2 dataframe not found!")
+
+DATA <- joined2
+
+vars <- c("price", "SP500_return", "VIX", "Treasury5Y")
+
+df_long <- DATA %>%
+  select(any_of(c("Date", vars))) %>%
+  mutate(Date = as.Date(Date)) %>%
+  arrange(Date) %>%
+  pivot_longer(
+    cols = -Date,
+    names_to = "Var_name",
+    values_to = "Var_value"
+  ) %>%
+  mutate(
+    Var_value_num = suppressWarnings(as.numeric(Var_value)),
+    Date_finite = !is.na(Date) & is.finite(as.numeric(Date)),
+    Var_finite  = is.finite(Var_value_num)
+  )
+
+message("df_long created successfully. Rows: ", nrow(df_long))
+
+# Replace DATA with dataframe name (e.g., joined2, df_pred_filtered)
+DATA <- joined2
+
+# Variables to plot (adjust to your actual column names)
+vars <- c("price", "SP500_return", "VIX", "Treasury5Y")
+
+# 1) pivot long and coerce, remove non-finite Dates/values
+df_long <- DATA %>%
+  select(any_of(c("Date", vars))) %>%
+  # ensure Date is Date class
+  mutate(Date = as.Date(Date)) %>%
+  arrange(Date) %>%
+  pivot_longer(cols = -Date, names_to = "Var_name", values_to = "Var_value") %>%
+  mutate(
+    Var_value_num = suppressWarnings(as.numeric(Var_value)),
+    Date_finite = !is.na(Date) & is.finite(as.numeric(Date)),
+    Var_finite  = is.finite(Var_value_num)
+  )
+
+# 2) show rows with non-finite Date or Var_value (if any)
+bad_rows <- df_long %>% filter(!Date_finite | !Var_finite)
+if (nrow(bad_rows) > 0) {
+  message("Found rows with non-finite Date or Var_value: showing up to 20")
+  print(head(bad_rows, 20))
+} else {
+  message("No non-finite Date/Var_value rows found.")
+}
+
+# 3) compute group diagnostics and detect near-constant groups
+group_diag <- df_long %>%
+  filter(Date_finite & Var_finite) %>%
+  group_by(Var_name) %>%
+  summarise(
+    n_obs = n(),
+    mean = mean(Var_value_num, na.rm = TRUE),
+    sd   = sd(Var_value_num, na.rm = TRUE),
+    n_na = sum(!Var_finite | !Date_finite),
+    .groups = "drop"
+  ) %>%
+  arrange(n_obs)
+
+print(group_diag)
+
+# 4) safe z-score: set Var_z = NA for groups with sd == 0 or sd is NA
+df_long_clean <- df_long %>%
+  filter(Date_finite & Var_finite) %>%   # drop non-finite rows
+  group_by(Var_name) %>%
+  mutate(
+    Var_mean = mean(Var_value_num, na.rm = TRUE),
+    Var_sd   = sd(Var_value_num, na.rm = TRUE),
+    Var_z    = if_else(is.na(Var_sd) | Var_sd == 0, NA_real_,
+                       (Var_value_num - Var_mean) / Var_sd)
+  ) %>%
+  ungroup()
+
+# 5) choose groups safe for smoothing (enough obs & nonzero sd)
+min_obs_for_smooth <- 10
+smooth_groups <- group_diag %>%
+  filter(n_obs >= min_obs_for_smooth, !is.na(sd), sd > 0) %>%
+  pull(Var_name)
+
+message("Groups used for smoothing (n >= ", min_obs_for_smooth, " and sd > 0):")
+print(smooth_groups)
+
+# 6) Plot: lines for all series; smoothing only for safe groups. Use linewidth not size.
+p <- ggplot(df_long_clean, aes(x = Date, y = Var_z, color = Var_name)) +
+  geom_line(linewidth = 0.6, alpha = 0.9, na.rm = TRUE) +
+  geom_smooth(
+    data = df_long_clean %>% filter(Var_name %in% smooth_groups),
+    aes(group = Var_name),
+    method = "loess",    # or "gam"/"lm" if you prefer
+    se = FALSE,
+    linewidth = 0.6,
+    na.rm = TRUE
+  ) +
+  labs(title = "Standardized series (z-score)",
+       subtitle = "Solid lines = series (z-score). Dashed = smooth trends (only for groups with enough data).",
+       x = "Date", y = "Z-score") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+print(p) 
+```
+
+```{r}
+# Answer: For vix and the 5 year treasury yield, there seems to be no fluctuation but for S&P 500 price index, the price seems to be fluctuating at a constant level. 
+
+```
+
+Note: if you find one of your variable displays a trend that drifts away over time, you should reconsider how to use that variable. (This is called non-stationary series in time series.)
